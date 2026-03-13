@@ -4,8 +4,7 @@ data/
 # 不上传所有 __pycache__ 目录
 __pycache__/
 
-# 不上传所有 Markdown 和 PDF 文件
-*.md
+# 不上传 PDF 文件
 *.pdf
 
 #不上传work_dirs

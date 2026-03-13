@@ -7,11 +7,12 @@ from pathlib import Path
 
 PROJECT_ROOT = Path("/home/dataset-local/lr/code/fusionnext")
 BEVDET_ROOT = Path("/home/dataset-local/lr/code/BEVDet")
-DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "fusionnext_nuscenes_mini_3d.py"
+PLUGIN_ROOT = PROJECT_ROOT / "projects" / "FusionNeXt"
+DEFAULT_CONFIG = PLUGIN_ROOT / "configs" / "fusionnext_nuscenes_mini_3d.py"
 
 
 def ensure_pythonpath() -> None:
-    for path in (str(PROJECT_ROOT), str(BEVDET_ROOT)):
+    for path in (str(PLUGIN_ROOT), str(PROJECT_ROOT), str(BEVDET_ROOT)):
         if path not in sys.path:
             sys.path.insert(0, path)
 
@@ -158,7 +159,7 @@ def run_train(args: argparse.Namespace) -> None:
         command.extend(["--cfg-options", *args.cfg_options])
 
     env = os.environ.copy()
-    pythonpath_parts = [str(PROJECT_ROOT), str(BEVDET_ROOT)]
+    pythonpath_parts = [str(PLUGIN_ROOT), str(PROJECT_ROOT), str(BEVDET_ROOT)]
     if env.get("PYTHONPATH"):
         pythonpath_parts.append(env["PYTHONPATH"])
     env["PYTHONPATH"] = os.pathsep.join(pythonpath_parts)

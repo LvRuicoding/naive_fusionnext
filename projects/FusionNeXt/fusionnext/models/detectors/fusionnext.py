@@ -19,7 +19,7 @@ try:
 except ImportError:
     flash_attn_varlen_func = None
 
-from fusion_head import FusionNeXtSimple3DHead
+from ..dense_heads import FusionNeXtSimple3DHead
 
 
 def register_detector_module(cls):

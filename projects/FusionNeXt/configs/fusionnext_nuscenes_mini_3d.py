@@ -3,14 +3,23 @@ import sys
 
 
 PROJECT_ROOT = "/home/dataset-local/lr/code/fusionnext"
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+PLUGIN_ROOT = os.path.join(PROJECT_ROOT, "projects", "FusionNeXt")
+for path in (PLUGIN_ROOT, PROJECT_ROOT):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
-from nuscenes_pipeline import build_fusionnext_dataset_cfg, build_fusionnext_model_cfg
+from fusionnext.datasets.pipelines import (
+    build_fusionnext_dataset_cfg,
+    build_fusionnext_model_cfg,
+)
 
 
 custom_imports = dict(
-    imports=["fusion", "fusion_head", "nuscenes_pipeline"],
+    imports=[
+        "fusionnext.models.detectors.fusionnext",
+        "fusionnext.models.dense_heads.fusionnext_simple_head",
+        "fusionnext.datasets.pipelines.fusionnext_nuscenes",
+    ],
     allow_failed_imports=False,
 )
 

@@ -19,15 +19,28 @@ projects/FusionNeXt/
     datasets/pipelines/
       fusionnext_nuscenes.py
     models/
-      detectors/fusionnext.py
+      backbones/fusionnext_backbone.py
       dense_heads/fusionnext_simple_head.py
+      detectors/fusionnext.py
+      fusion_models/fusionnext_core.py
+      layers/flash_window_block.py
+      serialization/geometry_serializer.py
+      tokenizers/
+        image_tokenizer.py
+        lidar_tokenizer.py
+      utils/
+        fusion_inputs.py
+        geometry.py
 tools/
   train.py
 ```
 
 Key files:
 
-- detector: `projects/FusionNeXt/fusionnext/models/detectors/fusionnext.py`
+- detector wrapper: `projects/FusionNeXt/fusionnext/models/detectors/fusionnext.py`
+- unified-sequence core: `projects/FusionNeXt/fusionnext/models/fusion_models/fusionnext_core.py`
+- token sorting / serialization: `projects/FusionNeXt/fusionnext/models/serialization/geometry_serializer.py`
+- cross-attention block: `projects/FusionNeXt/fusionnext/models/layers/flash_window_block.py`
 - detection head: `projects/FusionNeXt/fusionnext/models/dense_heads/fusionnext_simple_head.py`
 - nuScenes/BEVDet pipeline adapters: `projects/FusionNeXt/fusionnext/datasets/pipelines/fusionnext_nuscenes.py`
 - training entrypoint: `tools/train.py`

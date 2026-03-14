@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from mmdet3d.structures import get_box_type
 from mmdet3d.registry import MODELS
 
 try:
@@ -347,6 +348,8 @@ class FusionNeXtSimple3DHead(nn.Module):
             box_output = boxes.detach().cpu()
             if img_metas is not None:
                 box_type = img_metas[batch_idx].get("box_type_3d")
+                if isinstance(box_type, str):
+                    box_type = get_box_type(box_type)[0]
                 if box_type is not None and boxes.numel() > 0:
                     box_tensor = boxes.detach().cpu().clone()
                     box_tensor[:, 2] = box_tensor[:, 2] - box_tensor[:, 5] * 0.5

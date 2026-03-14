@@ -52,7 +52,9 @@ class FusionNuScenesDataset(BaseDataset):
         self.filter_empty_gt = filter_empty_gt
         self.use_valid_flag = use_valid_flag
         self.load_interval = load_interval
+        self.box_type_3d_name = box_type_3d
         self.box_type_3d, self.box_mode_3d = get_box_type(box_type_3d)
+        self.box_mode_3d_name = getattr(self.box_mode_3d, "name", str(self.box_mode_3d))
         super().__init__(
             ann_file=ann_file,
             data_root=data_root,
@@ -62,8 +64,8 @@ class FusionNuScenesDataset(BaseDataset):
             serialize_data=serialize_data,
             **kwargs,
         )
-        self._metainfo["box_type_3d"] = self.box_type_3d
-        self._metainfo["box_mode_3d"] = self.box_mode_3d
+        self._metainfo["box_type_3d"] = self.box_type_3d_name
+        self._metainfo["box_mode_3d"] = self.box_mode_3d_name
 
     def _join_data_path(self, path: str) -> str:
         if os.path.isabs(path) or not self.data_root:
@@ -101,8 +103,8 @@ class FusionNuScenesDataset(BaseDataset):
                     curr=parsed,
                     lidar_points=dict(lidar_path=parsed["lidar_path"]),
                     lidar_path=parsed["lidar_path"],
-                    box_type_3d=self.box_type_3d,
-                    box_mode_3d=self.box_mode_3d,
+                    box_type_3d=self.box_type_3d_name,
+                    box_mode_3d=self.box_mode_3d_name,
                 )
             )
         return data_list

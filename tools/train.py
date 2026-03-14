@@ -5,12 +5,11 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PLUGIN_ROOT = PROJECT_ROOT / "projects" / "FusionNeXt"
-DEFAULT_CONFIG = PLUGIN_ROOT / "configs" / "fusionnext_nuscenes_mini_3d.py"
+DEFAULT_CONFIG = PROJECT_ROOT / "configs" / "fusionnext_nuscenes_mini_3d.py"
 
 
 def ensure_pythonpath() -> None:
-    for path in (str(PLUGIN_ROOT), str(PROJECT_ROOT)):
+    for path in (str(PROJECT_ROOT),):
         if path not in sys.path:
             sys.path.insert(0, path)
 

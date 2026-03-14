@@ -7,9 +7,3 @@ name = "fusionnext"
 version = "0.1.0"
 description = "FusionNeXt training package"
 requires-python = ">=3.10"
-
-[tool.setuptools]
-package-dir = {"" = "projects/FusionNeXt"}
-
-[tool.setuptools.packages.find]
-where = ["projects/FusionNeXt"]

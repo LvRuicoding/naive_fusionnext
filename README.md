@@ -1,107 +1,218 @@
 # FusionNeXt
 
-FusionNeXt is organized as an OpenMMLab-style project plugin for the `bevdet`
-conda environment. The current implementation focuses on:
+FusionNeXt is an independent OpenMMLab-style repository for camera-LiDAR
+fusion experiments. The current codebase focuses on:
 
 - unified 1D token serialization for camera and LiDAR features
 - cross-modal attention over the unified token sequence
 - a minimal 3D detection head for nuScenes-mini
 
-## Repository Layout
+The repo no longer depends on the external `BEVDet` codebase at runtime.
 
-The active code lives under `projects/FusionNeXt`:
+## Repository Structure
+
+Top-level layout:
 
 ```text
-projects/FusionNeXt/
-  configs/
-    fusionnext_nuscenes_mini_3d.py
-  fusionnext/
-    datasets/pipelines/
+configs/
+  fusionnext_nuscenes_mini_3d.py
+fusionnext/
+  datasets/
+    fusionnext_nuscenes_dataset.py
+    pipelines/
       fusionnext_nuscenes.py
-    models/
-      backbones/fusionnext_backbone.py
-      dense_heads/fusionnext_simple_head.py
-      detectors/fusionnext.py
-      fusion_models/fusionnext_core.py
-      layers/flash_window_block.py
-      serialization/geometry_serializer.py
-      tokenizers/
-        image_tokenizer.py
-        lidar_tokenizer.py
-      utils/
-        fusion_inputs.py
-        geometry.py
+  models/
+    backbones/
+      fusionnext_backbone.py
+    data_preprocessors/
+      fusion_det3d_data_preprocessor.py
+    dense_heads/
+      fusionnext_simple_head.py
+    detectors/
+      fusionnext.py
+    fusion_models/
+      fusionnext_core.py
+    layers/
+      flash_window_block.py
+    serialization/
+      geometry_serializer.py
+    tokenizers/
+      image_tokenizer.py
+      lidar_tokenizer.py
+    utils/
+      fusion_inputs.py
+      geometry.py
 tools/
   train.py
+pyproject.toml
+README.md
 ```
 
-Key files:
+What each part is for:
 
-- detector wrapper: `projects/FusionNeXt/fusionnext/models/detectors/fusionnext.py`
-- unified-sequence core: `projects/FusionNeXt/fusionnext/models/fusion_models/fusionnext_core.py`
-- token sorting / serialization: `projects/FusionNeXt/fusionnext/models/serialization/geometry_serializer.py`
-- cross-attention block: `projects/FusionNeXt/fusionnext/models/layers/flash_window_block.py`
-- detection head: `projects/FusionNeXt/fusionnext/models/dense_heads/fusionnext_simple_head.py`
-- nuScenes/BEVDet pipeline adapters: `projects/FusionNeXt/fusionnext/datasets/pipelines/fusionnext_nuscenes.py`
+- `configs/`: training config files
+- `fusionnext/datasets/`: dataset definition and data pipeline
+- `fusionnext/models/`: model, tokenizers, serializer, backbone, head
+- `tools/train.py`: smoke test and training entrypoint
+- `pyproject.toml`: editable install metadata
+
+Important files:
+
+- detector wrapper: `fusionnext/models/detectors/fusionnext.py`
+- unified fusion core: `fusionnext/models/fusion_models/fusionnext_core.py`
+- 1D token sorting: `fusionnext/models/serialization/geometry_serializer.py`
+- fusion backbone: `fusionnext/models/backbones/fusionnext_backbone.py`
+- image/LiDAR input preparation: `fusionnext/datasets/pipelines/fusionnext_nuscenes.py`
+- dataset for local BEVDet-style nuScenes infos: `fusionnext/datasets/fusionnext_nuscenes_dataset.py`
 - training entrypoint: `tools/train.py`
 
-## Environment
+## Environment Setup
 
-Use the `bevdet` conda environment described in `AGENTS.md`.
-
-Example:
+Recommended environment:
 
 ```bash
-conda activate bevdet
+conda activate fusion
+pip install -e .
 ```
 
-The code expects the BEVDet codebase at:
+The code assumes your `fusion` environment already contains the required
+OpenMMLab stack, including:
 
-```text
-/home/dataset-local/lr/code/BEVDet
-```
+- `torch`
+- `torchvision`
+- `mmengine`
+- `mmcv`
+- `mmdet`
+- `mmdet3d`
+- `pyquaternion`
 
-and nuScenes mini info files/data under:
+## Data Layout
+
+The default config reads nuScenes-mini data from:
 
 ```text
 /home/dataset-local/lr/data/nuscenes
 ```
 
-## Training
-
-Smoke test one batch:
+At runtime, the repository uses the environment variable
+`FUSIONNEXT_DATA_ROOT`:
 
 ```bash
-conda run -n bevdet python /home/dataset-local/lr/code/fusionnext/tools/train.py \
+export FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes
+```
+
+Expected files for the current config:
+
+- `nuscenes_infos_train_mini_sweep.pkl`
+- `nuscenes_infos_val_mini_sweep.pkl`
+- image files under `samples/CAM_*`
+- lidar files under `samples/LIDAR_TOP`
+
+The current dataset loader is designed for the local BEVDet-style info format
+already present in this workspace.
+
+## How To Use
+
+Smoke test one sample:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/train.py \
   --mode smoke \
-  --config /home/dataset-local/lr/code/fusionnext/projects/FusionNeXt/configs/fusionnext_nuscenes_mini_3d.py \
+  --config configs/fusionnext_nuscenes_mini_3d.py \
   --gpu-id 0
 ```
 
-Start formal training:
+Smoke test with backward:
 
 ```bash
-conda run -n bevdet python /home/dataset-local/lr/code/fusionnext/tools/train.py \
-  --mode train \
-  --config /home/dataset-local/lr/code/fusionnext/projects/FusionNeXt/configs/fusionnext_nuscenes_mini_3d.py \
-  --gpu-id 0
-```
-
-Run with fewer dataloader workers:
-
-```bash
-conda run -n bevdet python /home/dataset-local/lr/code/fusionnext/tools/train.py \
-  --mode train \
-  --config /home/dataset-local/lr/code/fusionnext/projects/FusionNeXt/configs/fusionnext_nuscenes_mini_3d.py \
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/train.py \
+  --mode smoke \
+  --config configs/fusionnext_nuscenes_mini_3d.py \
   --gpu-id 0 \
-  --cfg-options data.workers_per_gpu=0
+  --backward
 ```
+
+Start training:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/train.py \
+  --mode train \
+  --config configs/fusionnext_nuscenes_mini_3d.py \
+  --work-dir work_dirs/fusionnext_nuscenes_mini_3d
+```
+
+Run a short training check:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/train.py \
+  --mode train \
+  --config configs/fusionnext_nuscenes_mini_3d.py \
+  --work-dir work_dirs/short_train_check \
+  --cfg-options \
+    train_cfg.max_epochs=1 \
+    train_dataloader.dataset.indices=2 \
+    train_dataloader.num_workers=0 \
+    train_dataloader.persistent_workers=False \
+    default_hooks.logger.interval=1
+```
+
+Override config fields from CLI:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/train.py \
+  --mode train \
+  --config configs/fusionnext_nuscenes_mini_3d.py \
+  --cfg-options train_dataloader.num_workers=0 optim_wrapper.optimizer.lr=1e-4
+```
+
+## Training Entry Script
+
+`tools/train.py` supports two modes:
+
+- `--mode smoke`: build dataset/model and run one training forward
+- `--mode train`: build `mmengine.Runner` and start training
+
+Useful arguments:
+
+- `--config`: config path, defaults to `configs/fusionnext_nuscenes_mini_3d.py`
+- `--work-dir`: override output directory
+- `--gpu-id`: CUDA device for smoke mode
+- `--cfg-options`: override config keys
+- `--num-samples`: number of samples used by smoke mode
+- `--sample-index`: starting dataset index for smoke mode
+- `--backward`: run backward in smoke mode
+
+## Current Config
+
+The default config:
+
+- uses `FusionNuScenesDataset`
+- uses `FusionDet3DDataPreprocessor`
+- trains `FusionNeXt` with `FusionNeXtSimple3DHead`
+- is configured for nuScenes-mini
+- disables validation and evaluator by default
+
+Training outputs are written to `work_dirs/`.
+
+## Debugging
+
+For step-by-step debugging, use `--mode smoke --num-samples 1`.
+
+The most useful places to set breakpoints are:
+
+- `tools/train.py`: sample loading and model call
+- `fusionnext/datasets/pipelines/fusionnext_nuscenes.py`: image/annotation pipeline
+- `fusionnext/models/fusion_models/fusionnext_core.py`: token generation
+- `fusionnext/models/serialization/geometry_serializer.py`: 1D token sorting
+- `fusionnext/models/backbones/fusionnext_backbone.py`: sort/recover flow
 
 ## Notes
 
-- The config uses a minimal `FusionNeXtSimple3DHead` intended for framework
-  integration and sequence-model experimentation, not for final detection
-  performance.
-- The dataset pipeline contains local compatibility adapters for the available
-  nuScenes mini info format used in this workspace.
-- Training outputs are written to `work_dirs/fusionnext_nuscenes_mini_3d/`.
+- `FusionNeXtSimple3DHead` is intended for integration and debugging, not final detection performance.
+- The current pipeline is tuned for the local nuScenes-mini info files in this workspace.
+- Validation/evaluation is not wired up in the default config yet.

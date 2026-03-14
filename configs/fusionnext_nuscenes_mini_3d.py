@@ -76,6 +76,7 @@ model = dict(
     voxel_size=voxel_size,
     embed_dim=256,
     image_weights="default",
+    image_patch_size=8,
     lidar_in_channels=5,
     bbox_head=bbox_head,
     train_cfg=dict(),

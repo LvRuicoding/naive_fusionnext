@@ -255,6 +255,7 @@ class GeometrySerializer(nn.Module):
                 "unified_coords": unified_coords,
                 "unified_padding_mask": unified_padding_mask,
                 "sort_keys": None,
+                "projected_lidar": lidar_coords_2d,
             }
         else:
             raise ValueError("mode must be '2d' or '3d'")

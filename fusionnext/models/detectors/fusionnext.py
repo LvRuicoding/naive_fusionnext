@@ -17,6 +17,7 @@ class FusionNeXt(Base3DDetector):
         voxel_size,
         embed_dim=256,
         image_weights=None,
+        image_patch_size=8,
         lidar_in_channels=5,
         bbox_head=None,
         train_cfg=None,
@@ -40,6 +41,7 @@ class FusionNeXt(Base3DDetector):
             voxel_size=voxel_size,
             embed_dim=embed_dim,
             image_weights=image_weights,
+            image_patch_size=image_patch_size,
             lidar_in_channels=lidar_in_channels,
         )
         self.bbox_head = self.build_bbox_head(bbox_head, embed_dim, voxel_size, point_cloud_range)

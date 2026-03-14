@@ -170,6 +170,70 @@ python tools/train.py \
   --cfg-options train_dataloader.num_workers=0 optim_wrapper.optimizer.lr=1e-4
 ```
 
+## Visualization
+
+The repo provides two visualization scripts:
+
+- `tools/visualize_sorted_tokens.py`: single-view serialization and projection plots
+- `tools/visualize_serialized_frame.py`: whole-frame overview with BEV and all 6 cameras
+
+Visualize 2D serialization order on the active main view:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/visualize_sorted_tokens.py \
+  --sample-index 0 \
+  --vis-mode 2d_serialization
+```
+
+Visualize 3D serialization order in BEV / voxel space:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/visualize_sorted_tokens.py \
+  --sample-index 0 \
+  --vis-mode 3d_serialization
+```
+
+Visualize how LiDAR tokens project onto the selected main view:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/visualize_sorted_tokens.py \
+  --sample-index 0 \
+  --vis-mode lidar_projection_2d
+```
+
+Enhanced joint-order visualization on the main view:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/visualize_sorted_tokens.py \
+  --sample-index 0 \
+  --vis-mode lidar_projection_2d_enhanced \
+  --vis-patch-size 12 \
+  --vis-voxel-size 0.8 0.8 1.6 \
+  --label-count 35
+```
+
+Whole-frame serialization overview:
+
+```bash
+conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+python tools/visualize_serialized_frame.py \
+  --sample-index 0 \
+  --vis-mode 2d_serialization
+```
+
+Notes:
+
+- `2d_serialization`: image-space serialization order on one view
+- `3d_serialization`: BEV / voxel-space serialization order
+- `lidar_projection_2d`: projected LiDAR tokens on the main view
+- `lidar_projection_2d_enhanced`: sparse joint-order plot for projected LiDAR tokens and main-view image tokens
+- `--vis-patch-size` and `--vis-voxel-size` are visualization-only overrides and do not change the training config
+- outputs are written to `work_dirs/visualizations/` unless `--output` is specified
+
 ## Training Entry Script
 
 `tools/train.py` supports two modes:

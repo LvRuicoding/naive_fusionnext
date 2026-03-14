@@ -12,10 +12,11 @@ class FusionNeXtMini(nn.Module):
         voxel_size,
         embed_dim=256,
         image_weights=None,
+        image_patch_size=8,
         lidar_in_channels=5,
     ):
         super().__init__()
-        self.image_branch = ImageTokenizer(embed_dim, image_weights=image_weights)
+        self.image_branch = ImageTokenizer(embed_dim, image_weights=image_weights, patch_size=image_patch_size)
         self.lidar_branch = RealLidarTokenizer(
             point_cloud_range=point_cloud_range,
             voxel_size=voxel_size,

@@ -1,26 +1,15 @@
 import torch.nn as nn
+from mmengine.structures import InstanceData
 
-try:
-    from mmdet.models import DETECTORS
-    from mmdet3d.models.builder import build_head
-    from mmdet3d.models.detectors.base import Base3DDetector
-except ImportError:
-    DETECTORS = None
-    build_head = None
-    Base3DDetector = nn.Module
+from mmdet3d.models.detectors.base import Base3DDetector
+from mmdet3d.registry import MODELS
 
 from ..dense_heads import FusionNeXtSimple3DHead
 from ..fusion_models import FusionNeXtMini
 from ..utils import prepare_fusion_inputs
 
 
-def register_detector_module(cls):
-    if DETECTORS is None:
-        return cls
-    return DETECTORS.register_module()(cls)
-
-
-@register_detector_module
+@MODELS.register_module()
 class FusionNeXt(Base3DDetector):
     def __init__(
         self,
@@ -32,8 +21,10 @@ class FusionNeXt(Base3DDetector):
         bbox_head=None,
         train_cfg=None,
         test_cfg=None,
+        data_preprocessor=None,
+        init_cfg=None,
     ):
-        super().__init__()
+        super().__init__(data_preprocessor=data_preprocessor, init_cfg=init_cfg)
         self.train_cfg = train_cfg
         self.test_cfg = test_cfg
         if bbox_head is None:
@@ -70,38 +61,41 @@ class FusionNeXt(Base3DDetector):
         cfg.setdefault("in_channels", embed_dim)
         cfg.setdefault("voxel_size", voxel_size)
         cfg.setdefault("point_cloud_range", point_cloud_range)
-
-        head_type = cfg.pop("type", "FusionNeXtSimple3DHead")
-        if build_head is not None:
-            return build_head(dict(type=head_type, **cfg))
-        if head_type != "FusionNeXtSimple3DHead":
-            raise ValueError(f"Unsupported bbox head without OpenMMLab registry: {head_type}")
-        return FusionNeXtSimple3DHead(**cfg)
+        return MODELS.build(cfg)
 
     def extract_feat(self, points, img_inputs, img_metas, **kwargs):
         del kwargs
-        img, voxels, K, T_c2l, post_rots, post_trans = prepare_fusion_inputs(points, img_inputs, img_metas)
+        img, voxels, intrins, cam_to_lidar, post_rots, post_trans = prepare_fusion_inputs(
+            points,
+            img_inputs,
+            img_metas,
+        )
         return self.core(
             img,
             voxels,
-            K,
-            T_c2l,
+            intrins,
+            cam_to_lidar,
             post_rots=post_rots,
             post_trans=post_trans,
             return_dict=True,
         )
 
-    def forward_train(
-        self,
-        points=None,
-        img_metas=None,
-        img_inputs=None,
-        gt_bboxes_3d=None,
-        gt_labels_3d=None,
-        **kwargs,
-    ):
+    def _forward(self, inputs, data_samples=None, **kwargs):
         del kwargs
-        features = self.extract_feat(points, img_inputs, img_metas)
+        img_metas = [] if data_samples is None else [sample.metainfo for sample in data_samples]
+        features = self.extract_feat(inputs["points"], inputs["img_inputs"], img_metas)
+        return self.bbox_head(
+            features["fusion_tokens"],
+            features["num_lidar_tokens"],
+            features["lidar_coords"],
+            features["unified_padding_mask"],
+            features["lidar_padding_mask"],
+        )
+
+    def loss(self, inputs, data_samples, **kwargs):
+        del kwargs
+        img_metas = [sample.metainfo for sample in data_samples]
+        features = self.extract_feat(inputs["points"], inputs["img_inputs"], img_metas)
         preds = self.bbox_head(
             features["fusion_tokens"],
             features["num_lidar_tokens"],
@@ -109,6 +103,9 @@ class FusionNeXt(Base3DDetector):
             features["unified_padding_mask"],
             features["lidar_padding_mask"],
         )
+
+        gt_bboxes_3d = [sample.gt_instances_3d.bboxes_3d for sample in data_samples]
+        gt_labels_3d = [sample.gt_instances_3d.labels_3d for sample in data_samples]
         return self.bbox_head.loss(
             preds,
             features["lidar_coords"],
@@ -117,9 +114,10 @@ class FusionNeXt(Base3DDetector):
             gt_labels_3d=gt_labels_3d,
         )
 
-    def simple_test(self, points, img_metas, img_inputs=None, **kwargs):
+    def predict(self, inputs, data_samples, **kwargs):
         del kwargs
-        features = self.extract_feat(points, img_inputs, img_metas)
+        img_metas = [sample.metainfo for sample in data_samples]
+        features = self.extract_feat(inputs["points"], inputs["img_inputs"], img_metas)
         preds = self.bbox_head(
             features["fusion_tokens"],
             features["num_lidar_tokens"],
@@ -133,10 +131,17 @@ class FusionNeXt(Base3DDetector):
             features["lidar_padding_mask"],
             img_metas=img_metas,
         )
-        return [{"pts_bbox": result} for result in pred_instances]
 
-    def aug_test(self, points, img_metas, img_inputs=None, **kwargs):
+        instance_list = []
+        for prediction in pred_instances:
+            instance_list.append(
+                InstanceData(
+                    bboxes_3d=prediction["boxes_3d"],
+                    scores_3d=prediction["scores_3d"],
+                    labels_3d=prediction["labels_3d"],
+                )
+            )
+        return self.add_pred_to_datasample(data_samples, data_instances_3d=instance_list)
+
+    def aug_test(self, inputs, data_samples=None, **kwargs):
         raise NotImplementedError("FusionNeXt does not support test-time augmentation yet.")
-
-    def forward_dummy(self, points=None, img_metas=None, img_inputs=None, **kwargs):
-        return self.extract_feat(points, img_inputs, img_metas, **kwargs)

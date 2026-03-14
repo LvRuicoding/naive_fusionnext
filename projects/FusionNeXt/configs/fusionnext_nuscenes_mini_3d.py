@@ -1,31 +1,20 @@
 import os
-import sys
 
 
-PROJECT_ROOT = "/home/dataset-local/lr/code/fusionnext"
-PLUGIN_ROOT = os.path.join(PROJECT_ROOT, "projects", "FusionNeXt")
-for path in (PLUGIN_ROOT, PROJECT_ROOT):
-    if path not in sys.path:
-        sys.path.insert(0, path)
-
-from fusionnext.datasets.pipelines import (
-    build_fusionnext_dataset_cfg,
-    build_fusionnext_model_cfg,
-)
-
+default_scope = "mmdet3d"
 
 custom_imports = dict(
     imports=[
+        "fusionnext.datasets.fusionnext_nuscenes_dataset",
+        "fusionnext.datasets.pipelines.fusionnext_nuscenes",
+        "fusionnext.models.data_preprocessors.fusion_det3d_data_preprocessor",
         "fusionnext.models.detectors.fusionnext",
         "fusionnext.models.dense_heads.fusionnext_simple_head",
-        "fusionnext.datasets.pipelines.fusionnext_nuscenes",
     ],
     allow_failed_imports=False,
 )
 
-plugin = False
-
-data_root = "/home/dataset-local/lr/data/nuscenes/"
+data_root = os.environ.get("FUSIONNEXT_DATA_ROOT", "data/nuscenes/")
 train_ann_file = os.path.join(data_root, "nuscenes_infos_train_mini_sweep.pkl")
 val_ann_file = os.path.join(data_root, "nuscenes_infos_val_mini_sweep.pkl")
 
@@ -41,6 +30,7 @@ class_names = [
     "pedestrian",
     "traffic_cone",
 ]
+metainfo = dict(classes=class_names)
 
 point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
 voxel_size = [0.2, 0.2, 0.4]
@@ -64,13 +54,6 @@ data_config = dict(
     resize_test=0.0,
 )
 
-bda_aug_conf = dict(
-    rot_lim=(-22.5, 22.5),
-    scale_lim=(0.95, 1.05),
-    flip_dx_ratio=0.5,
-    flip_dy_ratio=0.5,
-)
-
 bbox_head = dict(
     type="FusionNeXtSimple3DHead",
     num_classes=len(class_names),
@@ -86,90 +69,140 @@ bbox_head = dict(
     max_num=100,
 )
 
-model_train_cfg = dict()
-model_test_cfg = dict(score_thr=0.1)
-
-model = build_fusionnext_model_cfg(
+model = dict(
+    type="FusionNeXt",
+    data_preprocessor=dict(type="FusionDet3DDataPreprocessor"),
     point_cloud_range=point_cloud_range,
     voxel_size=voxel_size,
     embed_dim=256,
     image_weights="default",
     lidar_in_channels=5,
     bbox_head=bbox_head,
-    train_cfg=model_train_cfg,
-    test_cfg=model_test_cfg,
+    train_cfg=dict(),
+    test_cfg=dict(score_thr=0.1),
 )
 
-dataset_type = "NuScenesDataset"
-file_client_args = dict(backend="disk")
+backend_args = None
 
-data = dict(
-    samples_per_gpu=1,
-    workers_per_gpu=4,
-    train=build_fusionnext_dataset_cfg(
+train_pipeline = [
+    dict(type="FusionNeXtPrepareImageInputs", is_train=True, data_config=data_config),
+    dict(
+        type="LoadPointsFromFile",
+        coord_type="LIDAR",
+        load_dim=5,
+        use_dim=5,
+        backend_args=backend_args,
+    ),
+    dict(type="FusionNeXtLoadAnnotations", classes=class_names),
+    dict(type="FusionNeXtObjectRangeFilter", point_cloud_range=point_cloud_range),
+    dict(type="FusionNeXtObjectNameFilter", classes=class_names),
+    dict(type="FusionNeXtPrepareMeta"),
+    dict(
+        type="PackFusionDetInputs",
+        keys=["points", "img_inputs", "gt_bboxes_3d", "gt_labels_3d"],
+        meta_keys=("sample_idx", "token", "timestamp", "lidar_path", "box_type_3d", "box_mode_3d", "fusionnext_meta"),
+    ),
+]
+
+test_pipeline = [
+    dict(type="FusionNeXtPrepareImageInputs", data_config=data_config),
+    dict(
+        type="LoadPointsFromFile",
+        coord_type="LIDAR",
+        load_dim=5,
+        use_dim=5,
+        backend_args=backend_args,
+    ),
+    dict(type="FusionNeXtPrepareMeta"),
+    dict(
+        type="PackFusionDetInputs",
+        keys=["points", "img_inputs"],
+        meta_keys=("sample_idx", "token", "timestamp", "lidar_path", "box_type_3d", "box_mode_3d", "fusionnext_meta"),
+    ),
+]
+
+dataset_common = dict(
+    type="FusionNuScenesDataset",
+    data_root=data_root,
+    metainfo=metainfo,
+    modality=dict(
+        use_lidar=True,
+        use_camera=True,
+        use_radar=False,
+        use_map=False,
+        use_external=False,
+    ),
+    box_type_3d="LiDAR",
+)
+
+train_dataloader = dict(
+    batch_size=1,
+    num_workers=4,
+    persistent_workers=True,
+    sampler=dict(type="DefaultSampler", shuffle=True),
+    collate_fn=dict(type="pseudo_collate"),
+    dataset=dict(
+        **dataset_common,
         ann_file=train_ann_file,
-        data_root=data_root,
-        data_config=data_config,
-        class_names=class_names,
-        point_cloud_range=point_cloud_range,
-        bda_aug_conf=bda_aug_conf,
+        pipeline=train_pipeline,
         test_mode=False,
-        load_dim=5,
-        use_dim=5,
-        file_client_args=file_client_args,
-    ),
-    val=build_fusionnext_dataset_cfg(
-        ann_file=val_ann_file,
-        data_root=data_root,
-        data_config=data_config,
-        class_names=class_names,
-        point_cloud_range=point_cloud_range,
-        bda_aug_conf=bda_aug_conf,
-        test_mode=True,
-        load_dim=5,
-        use_dim=5,
-        file_client_args=file_client_args,
-    ),
-    test=build_fusionnext_dataset_cfg(
-        ann_file=val_ann_file,
-        data_root=data_root,
-        data_config=data_config,
-        class_names=class_names,
-        point_cloud_range=point_cloud_range,
-        bda_aug_conf=bda_aug_conf,
-        test_mode=True,
-        load_dim=5,
-        use_dim=5,
-        file_client_args=file_client_args,
     ),
 )
 
-optimizer = dict(
-    type="AdamW",
-    lr=2e-4,
-    betas=(0.9, 0.999),
-    weight_decay=0.01,
+val_dataloader = None
+test_dataloader = None
+
+train_cfg = dict(type="EpochBasedTrainLoop", max_epochs=12, val_interval=1)
+val_cfg = None
+test_cfg = None
+val_evaluator = None
+test_evaluator = None
+
+optim_wrapper = dict(
+    type="OptimWrapper",
+    optimizer=dict(
+        type="AdamW",
+        lr=2e-4,
+        betas=(0.9, 0.999),
+        weight_decay=0.01,
+    ),
+    clip_grad=dict(max_norm=35, norm_type=2),
 )
 
-optimizer_config = dict(grad_clip=dict(max_norm=35, norm_type=2))
+param_scheduler = [
+    dict(
+        type="LinearLR",
+        start_factor=1.0 / 3.0,
+        by_epoch=False,
+        begin=0,
+        end=500,
+    ),
+    dict(
+        type="MultiStepLR",
+        begin=0,
+        end=12,
+        by_epoch=True,
+        milestones=[8, 11],
+        gamma=0.1,
+    ),
+]
 
-lr_config = dict(
-    policy="step",
-    warmup="linear",
-    warmup_iters=500,
-    warmup_ratio=1.0 / 3.0,
-    step=[8, 11],
+default_hooks = dict(
+    timer=dict(type="IterTimerHook"),
+    logger=dict(type="LoggerHook", interval=20),
+    param_scheduler=dict(type="ParamSchedulerHook"),
+    checkpoint=dict(type="CheckpointHook", interval=1),
+    sampler_seed=dict(type="DistSamplerSeedHook"),
 )
 
-runner = dict(type="EpochBasedRunner", max_epochs=12)
+env_cfg = dict(
+    cudnn_benchmark=False,
+    mp_cfg=dict(mp_start_method="fork", opencv_num_threads=0),
+    dist_cfg=dict(backend="nccl"),
+)
 
-checkpoint_config = dict(interval=1)
-log_config = dict(interval=20, hooks=[dict(type="TextLoggerHook")])
-evaluation = dict(interval=1)
-
-dist_params = dict(backend="nccl")
+log_processor = dict(type="LogProcessor", window_size=20, by_epoch=True)
 log_level = "INFO"
 load_from = None
-resume_from = None
-workflow = [("train", 1)]
-work_dir = os.path.join(PROJECT_ROOT, "work_dirs", "fusionnext_nuscenes_mini_3d")
+resume = False
+work_dir = os.environ.get("FUSIONNEXT_WORK_DIR", "./work_dirs/fusionnext_nuscenes_mini_3d")

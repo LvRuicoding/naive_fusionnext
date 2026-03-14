@@ -1,0 +1,55 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FusionNeXt: train.py smoke",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "/home/dataset-local/envs/bevdet/bin/python",
+      "program": "${workspaceFolder}/tools/train.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "subProcess": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/projects/FusionNeXt:${workspaceFolder}:/home/dataset-local/lr/code/BEVDet:${env:PYTHONPATH}",
+        "CUDA_LAUNCH_BLOCKING": "1"
+      },
+      "args": [
+        "--mode",
+        "smoke",
+        "--config",
+        "${workspaceFolder}/projects/FusionNeXt/configs/fusionnext_nuscenes_mini_3d.py",
+        "--gpu-id",
+        "0",
+        "--num-samples",
+        "1",
+        "--sample-index",
+        "0"
+      ]
+    },
+    {
+      "name": "FusionNeXt: train.py train",
+      "type": "debugpy",
+      "request": "launch",
+      "python": "/home/dataset-local/envs/bevdet/bin/python",
+      "program": "${workspaceFolder}/tools/train.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "subProcess": true,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/projects/FusionNeXt:${workspaceFolder}:/home/dataset-local/lr/code/BEVDet:${env:PYTHONPATH}",
+        "CUDA_LAUNCH_BLOCKING": "1"
+      },
+      "args": [
+        "--mode",
+        "train",
+        "--config",
+        "${workspaceFolder}/projects/FusionNeXt/configs/fusionnext_nuscenes_mini_3d.py",
+        "--gpu-id",
+        "0"
+      ]
+    }
+  ]
+}

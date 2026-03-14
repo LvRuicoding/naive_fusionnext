@@ -3,22 +3,12 @@ from typing import Dict, List, Optional, Sequence, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-try:
-    from mmdet.models import HEADS
-except ImportError:
-    HEADS = None
+from mmdet3d.registry import MODELS
 
 try:
     from torchvision.ops import nms as torchvision_nms
 except ImportError:
     torchvision_nms = None
-
-
-def register_head_module(cls):
-    if HEADS is None:
-        return cls
-    return HEADS.register_module()(cls)
 
 
 def _to_label_tensor(labels, device: torch.device) -> torch.Tensor:
@@ -72,7 +62,7 @@ def _points_in_boxes(points: torch.Tensor, boxes: torch.Tensor) -> torch.Tensor:
     )
 
 
-@register_head_module
+@MODELS.register_module()
 class FusionNeXtSimple3DHead(nn.Module):
     def __init__(
         self,

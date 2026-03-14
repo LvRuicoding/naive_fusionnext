@@ -1,0 +1,55 @@
+ 数据管线
+
+  1. tools/train.py:122
+     samples.append(dataset[dataset_index])
+     入口断点。这里一单步就会进入 dataset 和 pipeline。
+  2. fusionnext/datasets/fusionnext_nuscenes_dataset.py:90
+     for info in infos:
+     看原始 pkl 里的 curr 被整理成什么字段，重点看：
+      - parsed["lidar_path"]
+      - parsed["cams"]
+      - parsed["gt_boxes"]
+      - parsed["gt_names"]
+  3. fusionnext/datasets/pipelines/fusionnext_nuscenes.py:183
+     img = Image.open(cam_data["data_path"]).convert("RGB")
+     看图像路径、相机内外参、增强前输入。
+  4. fusionnext/datasets/pipelines/fusionnext_nuscenes.py:249
+     results["gt_bboxes_3d"] = gt_bboxes_3d
+     看 GT 框和标签是否正确读出来。
+  5. fusionnext/datasets/pipelines/fusionnext_nuscenes.py:356
+     return { "inputs": inputs, "data_samples": data_sample }
+     看 pipeline 最终给模型的内容，重点看：
+      - inputs["points"]
+      - inputs["img_inputs"]
+      - data_sample.metainfo
+      - data_sample.gt_instances_3d
+  6. fusionnext/models/data_preprocessors/fusion_det3d_data_preprocessor.py:13
+  inputs = data["inputs"]
+  看 pseudo_collate 后的数据长什么样，以及 img_inputs 是怎么被 stack 成 batch 的。
+
+  7. fusionnext/models/utils/fusion_inputs.py:45
+     imgs, sensor2egos, ego2globals, intrins, post_rots, post_trans, bda = unpack_img_inputs(img_inputs)
+     这里看进入 fusion core 前，图像、点云、相机到激光雷达变换是否对。
+
+  1D token 排序
+  8. fusionnext/models/serialization/geometry_serializer.py:161
+  sorted_indices = torch.argsort(sort_keys, dim=1)
+  这是最关键的排序断点。重点观察：
+
+  - unified_coords[0, :20]
+  - q_coords[0, :20]
+  - sort_keys[0, :20]
+  - sorted_indices[0, :20]
+  - sorted_tokens[0, :20]
+
+  如果你还想确认“排序完之后有没有被正确还原”，再加 1 个断点：
+
+  - fusionnext/models/backbones/fusionnext_backbone.py:67
+    recovered_tokens = torch.gather(attended_tokens, 1, expanded_inv_indices)
+
+  建议调试命令直接用：
+
+  conda run -n fusion env FUSIONNEXT_DATA_ROOT=/home/dataset-local/lr/data/nuscenes \
+  python tools/train.py --mode smoke --config configs/fusionnext_nuscenes_mini_3d.py --gpu-id 0 --num-samples 1 --sample-index 0
+
+  如果你愿意，我下一条可以直接给你一份“每个断点进去以后具体该看哪些变量”的清单。

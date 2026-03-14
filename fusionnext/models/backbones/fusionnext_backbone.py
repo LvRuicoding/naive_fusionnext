@@ -6,7 +6,7 @@ from ..serialization import GeometrySerializer
 
 
 class FusionNeXtBackbone(nn.Module):
-    def __init__(self, embed_dim=256, num_layers=4, window_size=256):
+    def __init__(self, embed_dim=256, num_layers=4, window_size=80):
         super().__init__()
         self.num_layers = num_layers
         self.window_size = window_size
@@ -47,6 +47,8 @@ class FusionNeXtBackbone(nn.Module):
 
         for i in range(self.num_layers):
             mode = self.layer_modes[i]
+            layer_input_tokens = torch.cat([current_lidar_tokens, current_img_tokens], dim=1)
+            layer_input_padding_mask = torch.cat([current_lidar_padding_mask, current_img_padding_mask], dim=1)
             sorted_tokens, sorted_indices, sorted_padding_mask, num_serialized_lidar, num_views = self.serializer(
                 current_lidar_tokens,
                 lidar_coords,
@@ -61,11 +63,15 @@ class FusionNeXtBackbone(nn.Module):
                 img_padding_mask=current_img_padding_mask,
             )
             attended_tokens = self.blocks[i](sorted_tokens, padding_mask=sorted_padding_mask)
+            sorted_updates = attended_tokens - sorted_tokens
+            sorted_updates = sorted_updates.masked_fill(sorted_padding_mask.unsqueeze(-1), 0)
 
             inverse_indices = torch.argsort(sorted_indices, dim=1)
             expanded_inv_indices = inverse_indices.unsqueeze(-1).expand(-1, -1, C)
-            recovered_tokens = torch.gather(attended_tokens, 1, expanded_inv_indices)
+            recovered_updates = torch.gather(sorted_updates, 1, expanded_inv_indices)
             recovered_padding_mask = torch.gather(sorted_padding_mask, 1, inverse_indices)
+            recovered_tokens = layer_input_tokens + recovered_updates
+            recovered_tokens = recovered_tokens.masked_fill(layer_input_padding_mask.unsqueeze(-1), 0)
 
             recovered_lidar_tokens = recovered_tokens[:, :num_serialized_lidar, :]
             recovered_lidar_padding_mask = recovered_padding_mask[:, :num_serialized_lidar]

@@ -22,7 +22,7 @@ class FusionNeXtMini(nn.Module):
             in_channels=lidar_in_channels,
             embed_dim=embed_dim,
         )
-        self.fusion_backbone = FusionNeXtBackbone(embed_dim, num_layers=3)
+        self.fusion_backbone = FusionNeXtBackbone(embed_dim, num_layers=4)
 
     def forward(self, img, voxels, K, T_c2w, post_rots=None, post_trans=None, return_dict=False):
         if K.dim() == 4 and K.shape[1] != img.shape[1]:
